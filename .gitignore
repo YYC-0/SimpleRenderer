@@ -1,0 +1,9 @@
+.vs/
+Debug/
+images/
+reference/
+x64/
+SimpleRenderer.sln
+SimpleRenderer.vcxproj
+SimpleRenderer.vcxproj.filters
+SimpleRenderer.vcxproj.user
