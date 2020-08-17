@@ -1,12 +1,14 @@
 ﻿#include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 //#include "head/tgaimage.h"
 #include "head/model.h"
 #include "head/Renderer.h"
 #include <Eigen/Core>
 using namespace std;
+using namespace std::chrono;
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -144,23 +146,29 @@ void screen_update(void) {
 	screen_dispatch();
 }
 
-unsigned int** frameBuffer;
+unsigned int **frameBuffer;
+float **zBuffer;
 void init(int width, int height, void* fb)
 {
-	int need = sizeof(void*) * (height * 2 + 1024) + width * height * 8;
-	char* ptr = (char*)malloc(need + 64);
-	char* framebuf;
-	int j;
+	//int need = sizeof(void*) * (height * 2 + 1024) + width * height * 8;
+	int need = sizeof(void*) * width * height * 4 * 2;
+	char* ptr = (char*)malloc(need);
+	char *framebuf, *zbuf;
 	assert(ptr);
+
 	frameBuffer = (IUINT32**)ptr;
-	ptr += sizeof(void*) * height * 2;
-	ptr += sizeof(void*) * 1024;
+	zBuffer = (float **)(ptr + sizeof(void *) * height);
+
+	//ptr += sizeof(void*) * height * 2;
+	//ptr += sizeof(void*) * 1024;
 	framebuf = (char*)ptr;
-	ptr += width * height * 8;
+	zbuf = (char *)ptr + width * height * 4;
+	//ptr += width * height * 8;
 	if (fb != NULL)
 		framebuf = (char*)fb;
-	for (j = 0; j < height; j++) {
+	for (int j = 0; j < height; j++) {
 		frameBuffer[j] = (IUINT32*)(framebuf + width * 4 * j);
+		zBuffer[j] = (float *)(zbuf + width * 4 * j);
 	}
 }
 //-----------------------------------------------------------------------
@@ -171,29 +179,33 @@ const int HEIGHT = 800;
 
 int main()
 {
-	TCHAR* title = _T("TEST");
+	TCHAR *title = _T("TEST");
 	if (screen_init(WIDTH, HEIGHT, title))
 		return -1;
 	init(WIDTH, HEIGHT, screen_fb);
 
 	string model_path = "obj/african_head.obj";
 	Model model(model_path);
-	Renderer renderer(WIDTH, HEIGHT, frameBuffer);
+	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer);
 
-	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(50, 160),  Vector2i(70, 80)};
+	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(50, 70),  Vector2i(570, 70)};
 	Vector2i t1[3] = { Vector2i(180, 50),  Vector2i(150, 50),   Vector2i(70, 180) };
 	Vector2i t2[3] = { Vector2i(180, 150), Vector2i(70, 180), Vector2i(130, 180) };
-	//renderer.drawTriangle(t0[0], t0[1], t0[2], red);
+	//renderer.drawTriangle(t0[0], t0[1], t0[2], Color(255,255,255));
 	//renderer.drawTriangle(t1[0], t1[1], t1[2], white);
-	//renderer.drawTriangle(t2[0], t2[1], t2[2], red);
+	//renderer.drawTriangle(t2[0], t2[1], t2[2], red);x
 
 	while (screen_exit == 0 && screen_keys[VK_ESCAPE] == 0)
 	{
+		auto start = steady_clock::now();
 		screen_dispatch();
 
 		renderer.drawModel(model, Renderer::DrawMode::TRIANGLE);
 		screen_update();
-		Sleep(1);
+		//Sleep(1);
+		auto end = steady_clock::now();
+		double fps = 1.0 / duration<double>(end - start).count();
+		cout << "FPS: " << fps << '\r';
 	}
 
 	return 0;

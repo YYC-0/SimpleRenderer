@@ -6,14 +6,21 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <iostream>
-using namespace std;
 
-Renderer::Renderer(int w, int h, unsigned int** fb)
+Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf)
 {
 	width = w;
 	height = h;
 	frameBuffer = fb;
+	zBuffer = zbuf;
 	light_dir = Vector3f(0, 0, -1);
+
+	for(int i=0; i<height; ++i)
+		for (int j = 0; j < width; ++j)
+		{
+			frameBuffer[i][j] = 0;
+			zBuffer[i][j] = -1;
+		}
 }
 
 // 左下角为坐标原点
@@ -63,6 +70,7 @@ void Renderer::drawLine(Vector2i t0, Vector2i t1, const Color& c)
 	drawLine(t0.x(), t0.y(), t1.x(), t1.y(), c);
 }
 
+// 由屏幕二维坐标绘制三角形
 void Renderer::drawTriangle(Vector2i t0, Vector2i t1, Vector2i t2, const Color& color)
 {
 	//drawLine(t0, t1, c);
@@ -82,7 +90,31 @@ void Renderer::drawTriangle(Vector2i t0, Vector2i t1, Vector2i t2, const Color& 
 				set(x, y, color);
 			}
 		}
+}
 
+// 由屏幕三维坐标绘制三角形
+void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &color)
+{
+	int max_x = max(max(t0.x(), t1.x()), t2.x());
+	int min_x = min(min(t0.x(), t1.x()), t2.x());
+	int max_y = max(max(t0.y(), t1.y()), t2.y());
+	int min_y = min(min(t0.y(), t1.y()), t2.y());
+	for (int y = min_y; y <= max_y; ++y)
+		for (int x = min_x; x <= max_x; ++x)
+		{
+			Vector2i p(x, y);
+			pair<bool, Vector3f> p3f = barycentric(t0, t1, t2, p);
+			if (p3f.first == true)
+			{
+				float z = p3f.second.z();
+				if (isLegal(x, height - y))
+					if (zBuffer[height - y][x] < z)
+					{
+						zBuffer[height - y][x] = z;
+						set(x, y, color);
+					}
+			}
+		}
 }
 
 void Renderer::drawModel(const Model& model, DrawMode mode)
@@ -94,23 +126,23 @@ void Renderer::drawModel(const Model& model, DrawMode mode)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
-					Vector3f v0 = model.vert(face[j]);
-					Vector3f v1 = model.vert(face[(j + 1) % 3]);
-					int x0 = (v0.x() + 1.0) * width / 2; // obj 中是-1到1
-					int y0 = (v0.y() + 1.0) * height / 2.;
-					int x1 = (v1.x() + 1.0) * width / 2.;
-					int y1 = (v1.y() + 1.0) * height / 2.;
-					this->drawLine(x0, y0, x1, y1, Color());
+				Vector3f v0 = model.vert(face[j]);
+				Vector3f v1 = model.vert(face[(j + 1) % 3]);
+				int x0 = (v0.x() + 1.0) * width / 2; // obj 中是-1到1
+				int y0 = (v0.y() + 1.0) * height / 2.;
+				int x1 = (v1.x() + 1.0) * width / 2.;
+				int y1 = (v1.y() + 1.0) * height / 2.;
+				this->drawLine(x0, y0, x1, y1, Color());
 			}
 		}
 		else if (mode == DrawMode::TRIANGLE)
 		{
-			Vector2i screen_coords[3];
+			Vector3f screen_coords[3];
 			Vector3f world_coords[3];
 			for (int j = 0; j < 3; ++j)
 			{
 				Vector3f v = model.vert(face[j]);
-				screen_coords[j] = Vector2i((v.x() + 1.) * width / 2., (v.y() + 1.) * height / 2.);
+				screen_coords[j] = worldToScreen(v);
 				world_coords[j] = v;
 			}
 			// 三角形法线
@@ -146,9 +178,43 @@ bool Renderer::isInTriangle(const Vector2i& v0, const Vector2i& v1, const Vector
 		apac = ap.dot(ac),
 		apab = ap.dot(ab);
 	int denominator = acac * abab - acab * abac;
+	if (denominator == 0)
+		return false;
 	double u = (double)(abab * apac - acab * apab) / (double)denominator;
-	double v = (double)(acac*apab-acab*apac) / (double)denominator;
+	double v = (double)(acac * apab - acab * apac) / (double)denominator;
 	if (u >= 0 && v >= 0 && u + v <= 1)
 		return true;
 	return false;
+}
+
+// 输入三角形v0v1v2和二维点p (均为屏幕坐标系）
+// 输出是否在三角形内及p在三角形内的坐标
+pair<bool, Vector3f> Renderer::barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p)
+{
+	Vector2f v_0(v0.x(), v0.y()),
+		v_1(v1.x(), v1.y()),
+		v_2(v2.x(), v2.y()),
+		pp(p.x(), p.y());
+
+	Vector2f ab = v_1 - v_0,
+		ac = v_2 - v_0,
+		ap = pp - v_0;
+	float abab = ab.dot(ab),
+		abac = ab.dot(ac),
+		acab = ac.dot(ab),
+		acac = ac.dot(ac),
+		apac = ap.dot(ac),
+		apab = ap.dot(ab);
+	float denominator = acac * abab - acab * abac;
+	if (denominator == 0)
+		return pair<bool, Vector3f>(false, Vector3f(0,0,0));
+	double u = (double)(abab * apac - acab * apab) / (double)denominator;
+	double v = (double)(acac * apab - acab * apac) / (double)denominator;
+	if (u >= 0 && v >= 0 && u + v <= 1)
+	{
+		Vector3f p3f = v0 + u * v1 + v * v2;
+		return pair<bool, Vector3f>(true, p3f);
+	}
+
+	return pair<bool, Vector3f>(false, Vector3f(0, 0, 0));
 }

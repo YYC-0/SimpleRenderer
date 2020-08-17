@@ -1,5 +1,8 @@
 #pragma once
 #include "model.h"
+#include <Eigen/Core>
+using namespace std;
+using namespace Eigen;
 
 class Color
 {
@@ -25,18 +28,20 @@ public:
 	};
 
 	Renderer() = default;
-	Renderer(int w, int h, unsigned int** fb);
+	Renderer(int w, int h, unsigned int** fb, float** zbuf);
 
 	void set(const int& x, const int& y, const Color& c); // set pixel with color c
 	void drawLine(int x0, int y0, int x1, int y1, const Color& c);
 	void drawLine(Vector2i t0, Vector2i t1, const Color& c);
 	void drawTriangle(Vector2i t0, Vector2i t1, Vector2i t2, const Color& c);
+	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &c);
 	void drawModel(const Model& model, DrawMode mode);
 
 private:
 	int width;
 	int height;
 	unsigned int** frameBuffer;
+	float** zBuffer;
 	Vector3f light_dir;
 
 	inline bool isLegal(const int& x, const int& y) {
@@ -49,6 +54,9 @@ private:
 	// <0 if p right
 	int isLeft(Vector2i l0, Vector2i l1, Vector2i p);
 	bool isInTriangle(const Vector2i& v0, const Vector2i& v1, const Vector2i& v2, const Vector2i& p); // 判断点p是否在三角形内
-
+	std::pair<bool, Vector3f> barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p);
+	Vector3f worldToScreen(const Vector3f &v) {
+		return Vector3f(int((v.x() + 1.0) * width / 2.0 + 0.5), int((v.y() + 1.0) * height / 2.0 + 0.5), v.z());
+	}
 };
 
