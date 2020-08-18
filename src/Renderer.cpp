@@ -103,10 +103,14 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &
 		for (int x = min_x; x <= max_x; ++x)
 		{
 			Vector2i p(x, y);
-			pair<bool, Vector3f> p3f = barycentric(t0, t1, t2, p);
-			if (p3f.first == true)
+			pair<float, float> uv = barycentric(t0, t1, t2, p);
+			float u = uv.first, v = uv.second;
+			if (u >= 0 && v >= 0 && u + v <= 1)
 			{
-				float z = p3f.second.z();
+				Vector3f AB = t1 - t0,
+					AC = t2 - t0;
+				Vector3f p3f = t0 + u * AB + v * AC;
+				float z = p3f.z();
 				if (isLegal(x, height - y))
 					if (zBuffer[height - y][x] < z)
 					{
@@ -117,17 +121,51 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &
 		}
 }
 
-void Renderer::drawModel(const Model& model, DrawMode mode)
+// 绘制三角形 with texture
+void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, Vector2i uv0, Vector2i uv1, Vector2i uv2, float intensity)
 {
-	for (int i = 0; i < model.nfaces(); ++i)
+	int max_x = max(max(t0.x(), t1.x()), t2.x());
+	int min_x = min(min(t0.x(), t1.x()), t2.x());
+	int max_y = max(max(t0.y(), t1.y()), t2.y());
+	int min_y = min(min(t0.y(), t1.y()), t2.y());
+	for (int y = min_y; y <= max_y; ++y)
+		for (int x = min_x; x <= max_x; ++x)
+		{
+			Vector2i p(x, y);
+			pair<float, float> uv = barycentric(t0, t1, t2, p);
+			float u = uv.first, v = uv.second;
+			if (u >= 0 && v >= 0 && u + v <= 1)
+			{
+				Vector3f AB = t1 - t0,
+					AC = t2 - t0;
+				Vector3f p3f = t0 + v * AB + u * AC; // u v ？？
+				Vector2i uvAB = uv1 - uv0,
+					uvAC = uv2 - uv0;
+				Vector2f uvP = uv0.cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>(); // u v ？？
+				Color color = model->diffuse(Vector2i(uvP.x(), uvP.y())) * intensity;
+				float z = p3f.z();
+				if (isLegal(x, height - y))
+					if (zBuffer[height - y][x] < z)
+					{
+						zBuffer[height - y][x] = z;
+						set(x, y, color);
+					}
+			}
+		}
+}
+
+void Renderer::drawModel(Model *model, DrawMode mode)
+{
+	this->model = model;
+	for (int i = 0; i < model->nfaces(); ++i)
 	{
-		std::vector<int> face = model.face(i);
+		std::vector<int> face = model->face(i);
 		if (mode == DrawMode::LINE)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
-				Vector3f v0 = model.vert(face[j]);
-				Vector3f v1 = model.vert(face[(j + 1) % 3]);
+				Vector3f v0 = model->vert(face[j]);
+				Vector3f v1 = model->vert(face[(j + 1) % 3]);
 				int x0 = (v0.x() + 1.0) * width / 2; // obj 中是-1到1
 				int y0 = (v0.y() + 1.0) * height / 2.;
 				int x1 = (v1.x() + 1.0) * width / 2.;
@@ -141,18 +179,22 @@ void Renderer::drawModel(const Model& model, DrawMode mode)
 			Vector3f world_coords[3];
 			for (int j = 0; j < 3; ++j)
 			{
-				Vector3f v = model.vert(face[j]);
+				Vector3f v = model->vert(face[j]);
 				screen_coords[j] = worldToScreen(v);
 				world_coords[j] = v;
 			}
-			// 三角形法线
-			Vector3f n = (world_coords[2] - world_coords[1]).cross(world_coords[1] - world_coords[0]);
+			Vector3f n = (world_coords[2] - world_coords[1]).cross(world_coords[1] - world_coords[0]); // 三角形法线
 			n.normalize();
 			float intensity = n.dot(light_dir);
 			if (intensity > 0)
 			{
-				Color c(255.0 * intensity, 255.0 * intensity, 255.0 * intensity);
-				this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], c);
+				Vector2i uv[3];
+				for (int j = 0; j < 3; ++j)
+					uv[j] = model->uv(i, j);
+				//Color c(255.0 * intensity, 255.0 * intensity, 255.0 * intensity);
+				//this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], c);
+				this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2],
+					uv[0], uv[1], uv[2], intensity);
 			}
 		}
 	}
@@ -171,13 +213,13 @@ bool Renderer::isInTriangle(const Vector2i& v0, const Vector2i& v1, const Vector
 	Vector2i ab = v1 - v0,
 		ac = v2 - v0,
 		ap = p - v0;
-	int abab = ab.dot(ab),
+	long long abab = ab.dot(ab),
 		abac = ab.dot(ac),
 		acab = ac.dot(ab),
 		acac = ac.dot(ac),
 		apac = ap.dot(ac),
 		apab = ap.dot(ab);
-	int denominator = acac * abab - acab * abac;
+	long long denominator = acac * abab - acab * abac;
 	if (denominator == 0)
 		return false;
 	double u = (double)(abab * apac - acab * apab) / (double)denominator;
@@ -188,8 +230,8 @@ bool Renderer::isInTriangle(const Vector2i& v0, const Vector2i& v1, const Vector
 }
 
 // 输入三角形v0v1v2和二维点p (均为屏幕坐标系）
-// 输出是否在三角形内及p在三角形内的坐标
-pair<bool, Vector3f> Renderer::barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p)
+// 输出u v
+pair<float, float> Renderer::barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p)
 {
 	Vector2f v_0(v0.x(), v0.y()),
 		v_1(v1.x(), v1.y()),
@@ -199,22 +241,15 @@ pair<bool, Vector3f> Renderer::barycentric(const Vector3f &v0, const Vector3f &v
 	Vector2f ab = v_1 - v_0,
 		ac = v_2 - v_0,
 		ap = pp - v_0;
-	float abab = ab.dot(ab),
+	double abab = ab.dot(ab),
 		abac = ab.dot(ac),
 		acab = ac.dot(ab),
 		acac = ac.dot(ac),
 		apac = ap.dot(ac),
 		apab = ap.dot(ab);
-	float denominator = acac * abab - acab * abac;
-	if (denominator == 0)
-		return pair<bool, Vector3f>(false, Vector3f(0,0,0));
-	double u = (double)(abab * apac - acab * apab) / (double)denominator;
-	double v = (double)(acac * apab - acab * apac) / (double)denominator;
-	if (u >= 0 && v >= 0 && u + v <= 1)
-	{
-		Vector3f p3f = v0 + u * v1 + v * v2;
-		return pair<bool, Vector3f>(true, p3f);
-	}
+	double denominator = acac * abab - acab * abac;
+	double u = (float)(abab * apac - acab * apab) / (float)denominator;
+	double v = (float)(acac * apab - acab * apac) / (float)denominator;
 
-	return pair<bool, Vector3f>(false, Vector3f(0, 0, 0));
+	return pair<float, float>(u, v);
 }

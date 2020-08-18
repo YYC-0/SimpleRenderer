@@ -188,19 +188,19 @@ int main()
 	Model model(model_path);
 	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer);
 
-	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(50, 70),  Vector2i(570, 70)};
-	Vector2i t1[3] = { Vector2i(180, 50),  Vector2i(150, 50),   Vector2i(70, 180) };
+	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(400, 100),  Vector2i(200, 400)};
+	Vector3f t1[3] = { Vector3f(380, 700, 0),  Vector3f(150, 700, 0),   Vector3f(70, 480, 0) };
 	Vector2i t2[3] = { Vector2i(180, 150), Vector2i(70, 180), Vector2i(130, 180) };
 	//renderer.drawTriangle(t0[0], t0[1], t0[2], Color(255,255,255));
-	//renderer.drawTriangle(t1[0], t1[1], t1[2], white);
-	//renderer.drawTriangle(t2[0], t2[1], t2[2], red);x
+	//renderer.drawTriangle(t1[0], t1[1], t1[2], Color(255, 0, 0));
+	//renderer.drawTriangle(t2[0], t2[1], t2[2], Color(255,0,0);
 
 	while (screen_exit == 0 && screen_keys[VK_ESCAPE] == 0)
 	{
 		auto start = steady_clock::now();
 		screen_dispatch();
 
-		renderer.drawModel(model, Renderer::DrawMode::TRIANGLE);
+		renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE);
 		screen_update();
 		//Sleep(1);
 		auto end = steady_clock::now();

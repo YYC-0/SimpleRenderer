@@ -1,23 +1,9 @@
 #pragma once
 #include "model.h"
+#include "Color.h"
 #include <Eigen/Core>
 using namespace std;
 using namespace Eigen;
-
-class Color
-{
-public:
-	Color() : r(0), g(0), b(0), hex(0) {}
-	Color(unsigned int r_, unsigned int g_, unsigned int b_) :
-		r(r_), g(g_), b(b_) {
-		hex = b + (g << 8) + (r << 16);
-	}
-
-	unsigned int r;
-	unsigned int g;
-	unsigned int b;
-	unsigned int hex;
-};
 
 class Renderer
 {
@@ -35,7 +21,9 @@ public:
 	void drawLine(Vector2i t0, Vector2i t1, const Color& c);
 	void drawTriangle(Vector2i t0, Vector2i t1, Vector2i t2, const Color& c);
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &c);
-	void drawModel(const Model& model, DrawMode mode);
+	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
+						Vector2i uv0, Vector2i uv1, Vector2i uv2, float intensity);
+	void drawModel(Model *model, DrawMode mode);
 
 private:
 	int width;
@@ -43,6 +31,7 @@ private:
 	unsigned int** frameBuffer;
 	float** zBuffer;
 	Vector3f light_dir;
+	Model *model;
 
 	inline bool isLegal(const int& x, const int& y) {
 		if (x < 0 || x >= width || y < 0 || y >= height) return false;
@@ -54,7 +43,7 @@ private:
 	// <0 if p right
 	int isLeft(Vector2i l0, Vector2i l1, Vector2i p);
 	bool isInTriangle(const Vector2i& v0, const Vector2i& v1, const Vector2i& v2, const Vector2i& p); // 判断点p是否在三角形内
-	std::pair<bool, Vector3f> barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p);
+	std::pair<float, float> barycentric(const Vector3f &v0, const Vector3f &v1, const Vector3f &v2, const Vector2i &p);
 	Vector3f worldToScreen(const Vector3f &v) {
 		return Vector3f(int((v.x() + 1.0) * width / 2.0 + 0.5), int((v.y() + 1.0) * height / 2.0 + 0.5), v.z());
 	}
