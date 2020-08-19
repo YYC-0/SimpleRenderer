@@ -6,6 +6,7 @@
 //#include "head/tgaimage.h"
 #include "head/model.h"
 #include "head/Renderer.h"
+#include "head/Camera.h"
 #include <Eigen/Core>
 using namespace std;
 using namespace std::chrono;
@@ -184,9 +185,10 @@ int main()
 		return -1;
 	init(WIDTH, HEIGHT, screen_fb);
 
+	Camera *camera = new Camera();
 	string model_path = "obj/african_head.obj";
 	Model model(model_path);
-	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer);
+	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer, camera);
 
 	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(400, 100),  Vector2i(200, 400)};
 	Vector3f t1[3] = { Vector3f(380, 700, 0),  Vector3f(150, 700, 0),   Vector3f(70, 480, 0) };

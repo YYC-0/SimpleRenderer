@@ -19,6 +19,7 @@ public:
 	int nfaces() const;
 	Vector3f vert(int i) const;
 	Vector2i uv(int iface, int nvert);
+	Vector3f norm(int iface, int nvert);
 	Color diffuse(Vector2i uv);
 	std::vector<int> face(int idx) const;
 

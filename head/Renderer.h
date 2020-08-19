@@ -1,6 +1,7 @@
 #pragma once
 #include "model.h"
 #include "Color.h"
+#include "Camera.h"
 #include <Eigen/Core>
 using namespace std;
 using namespace Eigen;
@@ -14,7 +15,7 @@ public:
 	};
 
 	Renderer() = default;
-	Renderer(int w, int h, unsigned int** fb, float** zbuf);
+	Renderer(int w, int h, unsigned int** fb, float** zbuf, Camera *camera);
 
 	void set(const int& x, const int& y, const Color& c); // set pixel with color c
 	void drawLine(int x0, int y0, int x1, int y1, const Color& c);
@@ -23,7 +24,10 @@ public:
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &c);
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 						Vector2i uv0, Vector2i uv1, Vector2i uv2, float intensity);
-	void drawModel(Model *model, DrawMode mode);
+	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
+				Vector2i uv0, Vector2i uv1, Vector2i uv2, 
+				float ity0, float ity1, float ity2);
+	void drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix = Matrix4f::Identity());
 
 private:
 	int width;
@@ -32,6 +36,8 @@ private:
 	float** zBuffer;
 	Vector3f light_dir;
 	Model *model;
+	Camera *camera_;
+	Matrix4f projectMatrix_;
 
 	inline bool isLegal(const int& x, const int& y) {
 		if (x < 0 || x >= width || y < 0 || y >= height) return false;
@@ -47,5 +53,8 @@ private:
 	Vector3f worldToScreen(const Vector3f &v) {
 		return Vector3f(int((v.x() + 1.0) * width / 2.0 + 0.5), int((v.y() + 1.0) * height / 2.0 + 0.5), v.z());
 	}
+	Vector3f modelTransform(const Vector3f &p, const Matrix4f& transformMatrix); // Æë´Î¾ØÕó
+	Vector3f modelTransform(const Vector3f &p, const Matrix3f &rotation, const Vector3f &translate);
+	Vector3f transform(const Vector3f &p, const Matrix4f &transformMatrix);
 };
 
