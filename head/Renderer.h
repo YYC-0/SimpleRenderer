@@ -16,6 +16,7 @@ public:
 
 	Renderer() = default;
 	Renderer(int w, int h, unsigned int** fb, float** zbuf, Camera *camera);
+	void bufferClear(); // clear frame buffer and z buffer
 
 	void set(const int& x, const int& y, const Color& c); // set pixel with color c
 	void drawLine(int x0, int y0, int x1, int y1, const Color& c);
@@ -37,7 +38,11 @@ private:
 	Vector3f light_dir;
 	Model *model;
 	Camera *camera_;
-	Matrix4f projectMatrix_;
+	Matrix4f projectionMatrix_;
+	Matrix4f viewPortMatrix_;
+	float FOV_;
+	float zNear_;
+	float zFar_;
 
 	inline bool isLegal(const int& x, const int& y) {
 		if (x < 0 || x >= width || y < 0 || y >= height) return false;
@@ -53,8 +58,8 @@ private:
 	Vector3f worldToScreen(const Vector3f &v) {
 		return Vector3f(int((v.x() + 1.0) * width / 2.0 + 0.5), int((v.y() + 1.0) * height / 2.0 + 0.5), v.z());
 	}
-	Vector3f modelTransform(const Vector3f &p, const Matrix4f& transformMatrix); // Æë´Î¾ØÕó
+	Vector3f transform2(const Vector3f &p, const Matrix4f& transformMatrix); // Æë´Î¾ØÕó
 	Vector3f modelTransform(const Vector3f &p, const Matrix3f &rotation, const Vector3f &translate);
 	Vector3f transform(const Vector3f &p, const Matrix4f &transformMatrix);
+	void initProjectionMatrix();
 };
-

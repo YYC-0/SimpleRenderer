@@ -16,16 +16,34 @@ Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera
 	zBuffer = zbuf;
 	light_dir = Vector3f(0, 0, 1);
 
-	for(int i=0; i<height; ++i)
+	bufferClear();
+	camera_ = camera;
+
+	zNear_ = -0.1;
+	zFar_ = -100.0;
+	FOV_ = M_PI / 4;
+
+	initProjectionMatrix();
+	cout << "View Matrix:\n" << camera_->getViewMatrix() << endl;
+	cout << "Projection Matrix:\n" << projectionMatrix_ << endl;
+	//projectionMatrix_ = Matrix4f::Identity();
+	//float c = camera_->getPos().norm();
+	//projectionMatrix_(3, 2) = -1.0 / c;
+	viewPortMatrix_ <<
+		width/2,0,			0,		 width/2,
+		0,		height/2,	0,		 height/2,
+		0,		0,			1.0/2.0, 1.0/2.0,
+		0,		0,			0,		 1;
+}
+
+void Renderer::bufferClear()
+{
+	for (int i = 0; i < height; ++i)
 		for (int j = 0; j < width; ++j)
 		{
 			frameBuffer[i][j] = 0;
 			zBuffer[i][j] = -10;
 		}
-	camera_ = camera;
-	projectMatrix_ = Matrix4f::Identity();
-	float c = camera_->getPos().norm();
-	projectMatrix_(3, 2) = -1.0 / c;
 }
 
 // 左下角为坐标原点
@@ -169,10 +187,10 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 							Vector2i uv0, Vector2i uv1, Vector2i uv2, 
 							float ity0, float ity1, float ity2)
 {
-	int max_x = max(max(t0.x(), t1.x()), t2.x());
-	int min_x = min(min(t0.x(), t1.x()), t2.x());
-	int max_y = max(max(t0.y(), t1.y()), t2.y());
-	int min_y = min(min(t0.y(), t1.y()), t2.y());
+	int max_x = min((int)max(max(t0.x(), t1.x()), t2.x()), width-1);
+	int min_x = max((int)min(min(t0.x(), t1.x()), t2.x()), 0);
+	int max_y = min((int)max(max(t0.y(), t1.y()), t2.y()), height-1);
+	int min_y = max((int)min(min(t0.y(), t1.y()), t2.y()), 0);
 	for (int y = min_y; y <= max_y; ++y)
 		for (int x = min_x; x <= max_x; ++x)
 		{
@@ -193,11 +211,9 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 				if (intensity < 0)
 					intensity = 0;
 				Color color = model->diffuse(Vector2i(uvP.x(), uvP.y())) * intensity;
-				if (color.r > 255)
-					cout << "a";
 				float z = p3f.z();
 				if (isLegal(x, height - y))
-					if (zBuffer[height - y][x] < z)
+					if (z > zBuffer[height - y][x])
 					{
 						zBuffer[height - y][x] = z;
 						set(x, y, color);
@@ -210,43 +226,36 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 {
 	this->model = model;
 	Matrix4f viewMatrix = camera_->getViewMatrix();
-	Matrix4f MVP = projectMatrix_ * viewMatrix * modelMatrix;
+	Matrix4f MVP = projectionMatrix_ * viewMatrix * modelMatrix;
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
 		std::vector<int> face = model->face(i);
+
+		Vector3f screen_coords[3];
+		Vector3f world_coords[3];
+		Vector3f model_coords[3];
+		Vector2i uv[3];
+		float intensity[3];
+		for (int j = 0; j < 3; ++j)
+		{
+			Vector3f v = model->vert(face[j]);
+			world_coords[j] = v;
+			model_coords[j] = transform(v, MVP);
+			screen_coords[j] = transform(model_coords[j], viewPortMatrix_);
+			//screen_coords[j] = worldToScreen(model_coords[j]);
+			intensity[j] = max(model->norm(i, j).dot(light_dir), 0.3f);
+			uv[j] = model->uv(i, j);
+		}
 		if (mode == DrawMode::LINE)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
-				Vector3f v0 = model->vert(face[j]);
-				Vector3f v1 = model->vert(face[(j + 1) % 3]);
-				int x0 = (v0.x() + 1.0) * width / 2; // obj 中是-1到1
-				int y0 = (v0.y() + 1.0) * height / 2.;
-				int x1 = (v1.x() + 1.0) * width / 2.;
-				int y1 = (v1.y() + 1.0) * height / 2.;
-				this->drawLine(x0, y0, x1, y1, Color(255,255,255));
+				this->drawLine(screen_coords[j].x(), screen_coords[j].y(),
+					screen_coords[(j + 1) % 3].x(), screen_coords[(j + 1) % 3].y(), Color(255, 255, 255));
 			}
 		}
 		else if (mode == DrawMode::TRIANGLE)
 		{
-			Vector3f screen_coords[3];
-			Vector3f world_coords[3];
-			Vector3f model_coords[3];
-			Vector2i uv[3];
-			float intensity[3];
-			for (int j = 0; j < 3; ++j)
-			{
-				Vector3f v = model->vert(face[j]);
-				world_coords[j] = v;
-				model_coords[j] = transform(v, MVP);
-				//Matrix3f modelMatrix = AngleAxisf(M_PI / 2, Vector3f(0, 1, 0)).matrix();
-				//Vector3f translate(0, 0, 0);
-				//model_coords[j] = modelTransform(v, modelMatrix, translate);
-				screen_coords[j] = worldToScreen(model_coords[j]);
-				intensity[j] = model->norm(i, j).dot(light_dir);
-				uv[j] = model->uv(i, j);
-			}
-
 			//Vector3f n = (world_coords[1] - world_coords[0]).cross(world_coords[2] - world_coords[1]); // 三角形法线
 			//n.normalize();
 			//float intensity = n.dot(light_dir);
@@ -327,13 +336,6 @@ pair<float, float> Renderer::barycentric(const Vector3f &v0, const Vector3f &v1,
 	return pair<float, float>(u, v);
 }
 
-Vector3f Renderer::modelTransform(const Vector3f &p, const Matrix4f& transformMatrix)
-{
-	Vector4f p_h(p.x(), p.y(), p.z(), 1);
-	Vector4f p_after = transformMatrix * p_h;
-	//return Vector3f(p_after.x() / p_after[3], p_after.y() / p_after[3], p_after.z() / p_after[3]);
-	return Vector3f(p_after.x(), p_after.y(), p_after.z());
-}
 
 Vector3f Renderer::modelTransform(const Vector3f &p, const Matrix3f &rotation, const Vector3f &translate)
 {
@@ -344,5 +346,26 @@ Vector3f Renderer::transform(const Vector3f &p, const Matrix4f &transformMatrix)
 {
 	Vector4f p_h(p.x(), p.y(), p.z(), 1);
 	Vector4f p_after = transformMatrix * p_h;
+	return Vector3f(p_after.x() / p_after[3], p_after.y() / p_after[3], p_after.z() / p_after[3]);
+	//return Vector3f(p_after.x(), p_after.y(), p_after.z());
+}
+Vector3f Renderer::transform2(const Vector3f &p, const Matrix4f &transformMatrix)
+{
+	Vector4f p_h(p.x(), p.y(), p.z(), 1);
+	Vector4f p_after = transformMatrix * p_h;
+	//return Vector3f(p_after.x() / p_after[3], p_after.y() / p_after[3], p_after.z() / p_after[3]);
 	return Vector3f(p_after.x(), p_after.y(), p_after.z());
+}
+
+// 初始化透视矩阵
+void Renderer::initProjectionMatrix()
+{
+	float ar = (float)width / (float)height;
+	float zRange = zFar_ - zNear_;
+	float tanHalfFOV = tanf(FOV_ / 2.0);
+	projectionMatrix_ <<
+		1.0/(ar * tanHalfFOV), 0,	0, 0,
+		0, 1.0/tanHalfFOV,			0, 0,
+		0, 0, (-zNear_-zFar_)/zRange, -2.0*zFar_*zNear_/zRange,
+		0, 0, -1.0, 0;
 }

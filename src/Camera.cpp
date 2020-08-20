@@ -9,6 +9,7 @@
 
 Camera::Camera(Vector3f pos, Vector3f target, Vector3f up): up_(up)
 {
+	distance = pos.norm();
 	updateLookAt(pos, target);
 }
 
@@ -16,7 +17,12 @@ void Camera::updateLookAt(Vector3f pos, Vector3f target)
 {
 	pos_ = pos;
 	target_ = target;
-	direction_ = target_ - pos_;
+	updateLookAt();
+}
+
+void Camera::updateLookAt()
+{
+	direction_ = pos_ - target_;
 	direction_.normalize();
 	cameraRight_ = up_.cross(direction_);
 	cameraRight_.normalize();
@@ -30,4 +36,46 @@ void Camera::updateLookAt(Vector3f pos, Vector3f target)
 	Tr.block<3, 1>(0, 3) = -pos_;
 
 	viewMatrix_ = Minv * Tr;
+}
+
+void Camera::move(Action action)
+{
+	switch (action)
+	{
+	case Action::UP:
+		pos_ = pos_ + cameraUp_ * 0.1;
+		direction_ = pos_ - target_;
+		direction_.normalize();
+		pos_ = target_ + direction_ * distance;
+		break;
+	case Action::DOWN:
+		pos_ = pos_ - cameraUp_ * 0.1;
+		direction_ = pos_ - target_;
+		direction_.normalize();
+		pos_ = target_ + direction_ * distance;
+		break;
+	case Action::LEFT:
+		pos_ = pos_ - cameraRight_ * 0.1;
+		direction_ = pos_ - target_;
+		direction_.normalize();
+		pos_ = target_ +  direction_ * distance;
+		break;
+	case Action::RIGHT:
+		pos_ = pos_ + cameraRight_ * 0.1;
+		direction_ = pos_ - target_;
+		direction_.normalize();
+		pos_ = target_ + direction_ * distance;
+		break;
+	case Action::ZOOM_IN:
+		distance -= 0.1;
+		pos_ = target_ + direction_ * distance;
+		break;
+	case Action::ZOOM_OUT:
+		distance += 0.1;
+		pos_ = target_ + direction_ * distance;
+		break;
+	default:
+		break;
+	}
+	updateLookAt();
 }

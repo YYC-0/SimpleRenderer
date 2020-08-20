@@ -201,8 +201,28 @@ int main()
 	{
 		auto start = steady_clock::now();
 		screen_dispatch();
+		renderer.bufferClear();
 
-		renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE);
+		if (screen_keys[VK_RIGHT] || screen_keys['D'])
+			camera->move(Camera::Action::RIGHT);
+		if (screen_keys[VK_LEFT] || screen_keys['A'])
+			camera->move(Camera::Action::LEFT);
+		if (screen_keys[VK_UP] || screen_keys['W'])
+			camera->move(Camera::Action::UP);
+		if (screen_keys[VK_DOWN] || screen_keys['S'])
+			camera->move(Camera::Action::DOWN);
+		if (screen_keys['Q'])
+			camera->move(Camera::Action::ZOOM_IN);
+		if (screen_keys['E'])
+			camera->move(Camera::Action::ZOOM_OUT);
+
+		Matrix4f modelMatrix;
+		modelMatrix <<
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			0, 0, 0, 1;
+		renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE, modelMatrix);
 		screen_update();
 		//Sleep(1);
 		auto end = steady_clock::now();
