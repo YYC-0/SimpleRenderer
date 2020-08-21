@@ -14,7 +14,7 @@ Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera
 	height = h;
 	frameBuffer = fb;
 	zBuffer = zbuf;
-	light_dir = Vector3f(0, 0, 1);
+	light_dir = Vector3f(1, 1, 1);
 
 	bufferClear();
 	camera_ = camera;
@@ -184,7 +184,7 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, Vector2i uv0,
 // draw triangle with texture
 // Gouraud shading
 void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, 
-							Vector2i uv0, Vector2i uv1, Vector2i uv2, 
+							Vector2i uv0, Vector2i uv1, Vector2i uv2,
 							float ity0, float ity1, float ity2)
 {
 	int max_x = min((int)max(max(t0.x(), t1.x()), t2.x()), width-1);
@@ -222,6 +222,44 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 		}
 }
 
+// draw triangle with normal map
+void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, 
+	Vector2i uv0, Vector2i uv1, Vector2i uv2)
+{
+	int max_x = min((int)max(max(t0.x(), t1.x()), t2.x()), width - 1);
+	int min_x = max((int)min(min(t0.x(), t1.x()), t2.x()), 0);
+	int max_y = min((int)max(max(t0.y(), t1.y()), t2.y()), height - 1);
+	int min_y = max((int)min(min(t0.y(), t1.y()), t2.y()), 0);
+	for (int y = min_y; y <= max_y; ++y)
+		for (int x = min_x; x <= max_x; ++x)
+		{
+			Vector2i p(x, y);
+			pair<float, float> uv = barycentric(t0, t1, t2, p);
+			float u = uv.first, v = uv.second;
+			if (u >= 0 && v >= 0 && u + v <= 1)
+			{
+				Vector3f AB = t1 - t0,
+					AC = t2 - t0;
+				Vector3f p3f = t0 + v * AB + u * AC; // u v £¿£¿
+				Vector2i uvAB = uv1 - uv0,
+					uvAC = uv2 - uv0;
+				Vector2f uvP = uv0.cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>(); // u v £¿£¿
+				Color diffuse = model->diffuse(Vector2i(uvP.x(), uvP.y()));
+				Vector3f n = model->normal(Vector2i(uvP.x(), uvP.y()));
+				float intensity = max(n.dot(light_dir), 0.3f);
+
+				Color color = diffuse * intensity;
+				float z = p3f.z();
+				if (isLegal(x, height - y))
+					if (z > zBuffer[height - y][x])
+					{
+						zBuffer[height - y][x] = z;
+						set(x, y, color);
+					}
+			}
+		}
+}
+
 void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 {
 	this->model = model;
@@ -235,15 +273,18 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 		Vector3f world_coords[3];
 		Vector3f model_coords[3];
 		Vector2i uv[3];
+		Vector2i normal[3];
 		float intensity[3];
 		for (int j = 0; j < 3; ++j)
 		{
+			// get vertex
 			Vector3f v = model->vert(face[j]);
 			world_coords[j] = v;
+			// coordnate transform
 			model_coords[j] = transform(v, MVP);
 			screen_coords[j] = transform(model_coords[j], viewPortMatrix_);
 			//screen_coords[j] = worldToScreen(model_coords[j]);
-			intensity[j] = max(model->norm(i, j).dot(light_dir), 0.3f);
+			intensity[j] = max(model->normal(i, j).dot(light_dir), 0.3f);
 			uv[j] = model->uv(i, j);
 		}
 		if (mode == DrawMode::LINE)
@@ -270,11 +311,14 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			//	this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2],
 			//		uv[0], uv[1], uv[2], 1);
 			//}
+
 			// Gouroud shading
-			if (intensity[0] > 0 || intensity[1] > 0 || intensity[2] > 0)
+			/*if (intensity[0] > 0 || intensity[1] > 0 || intensity[2] > 0)
 				this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2],
 								uv[0], uv[1], uv[2],
-								intensity[0], intensity[1], intensity[2]);
+								intensity[0], intensity[1], intensity[2]);*/
+			// normal map
+			this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0], uv[1], uv[2]);
 		}
 	}
 }

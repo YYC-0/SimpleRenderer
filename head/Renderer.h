@@ -26,8 +26,10 @@ public:
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 						Vector2i uv0, Vector2i uv1, Vector2i uv2, float intensity);
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
-				Vector2i uv0, Vector2i uv1, Vector2i uv2, 
+				Vector2i uv0, Vector2i uv1, Vector2i uv2,
 				float ity0, float ity1, float ity2);
+	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
+					Vector2i uv0, Vector2i uv1, Vector2i uv2);
 	void drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix = Matrix4f::Identity());
 
 private:

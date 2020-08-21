@@ -1,5 +1,4 @@
-#ifndef __MODEL_H__
-#define __MODEL_H__
+#pragma once
 
 #include <vector>
 #include <string>
@@ -19,8 +18,10 @@ public:
 	int nfaces() const;
 	Vector3f vert(int i) const;
 	Vector2i uv(int iface, int nvert);
-	Vector3f norm(int iface, int nvert);
+	Vector3f normal(int iface, int nvert);
+	Vector3f normal(Vector2i uv);
 	Color diffuse(Vector2i uv);
+	float specular(Vector2i uv);
 	std::vector<int> face(int idx) const;
 
 private:
@@ -29,7 +30,8 @@ private:
 	std::vector<Vector3f> norms;
 	std::vector<Vector2f> uv_;
 	TGAImage diffusemap_;
+	TGAImage normalmap_;
+	TGAImage specularmap_;
 	void load_texture(std::string fileName, const char *suffix, TGAImage &img);
 };
 
-#endif //__MODEL_H__
