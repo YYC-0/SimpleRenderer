@@ -6,7 +6,6 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <iostream>
-# define M_PI 3.14159265358979323846
 
 Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera)
 {
@@ -14,7 +13,7 @@ Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera
 	height = h;
 	frameBuffer = fb;
 	zBuffer = zbuf;
-	light_dir = Vector3f(1, 1, 1);
+	lightDir_ = Vector3f(1, 0, 0);
 
 	bufferClear();
 	camera_ = camera;
@@ -44,13 +43,6 @@ void Renderer::bufferClear()
 			frameBuffer[i][j] = 0;
 			zBuffer[i][j] = -10;
 		}
-}
-
-// 左下角为坐标原点
-void Renderer::set(const int& x, const int& y, const Color& c)
-{
-	if (isLegal(x, height - y))
-		frameBuffer[height - y][x] = c.hex;
 }
 
 
@@ -183,10 +175,11 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, Vector2i uv0,
 
 // draw triangle with texture
 // Gouraud shading
-void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, 
+void Renderer::drawTriangle_gouraud(Vector3f t0, Vector3f t1, Vector3f t2,
+							Vector3f n0, Vector3f n1, Vector3f n2,
 							Vector2i uv0, Vector2i uv1, Vector2i uv2,
-							float ity0, float ity1, float ity2)
-{
+							Matrix4f normalMatrix, Matrix3f TBN)
+{		
 	int max_x = min((int)max(max(t0.x(), t1.x()), t2.x()), width-1);
 	int min_x = max((int)min(min(t0.x(), t1.x()), t2.x()), 0);
 	int max_y = min((int)max(max(t0.y(), t1.y()), t2.y()), height-1);
@@ -205,24 +198,35 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 				Vector2i uvAB = uv1 - uv0,
 					uvAC = uv2 - uv0;
 				Vector2f uvP = uv0.cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>(); // u v ？？
-				float iAB = ity1 - ity0,
-					iAC = ity2 - ity0;
-				float intensity = ity0 + v * iAB + u * iAC;
-				if (intensity < 0)
-					intensity = 0;
-				Color color = model->diffuse(Vector2i(uvP.x(), uvP.y())) * intensity;
+
+				Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
+
+				// 计算法线空间中的光线方向
+				Vector3f NAB = n1 - n0,
+					NAC = n2 - n0;
+				Vector3f triN = n0 + v * NAB + u * NAC;
+				triN.normalize();
+				Vector3f N = transform(triN, normalMatrix);
+				N.normalize();
+				TBN.row(2) = N;
+				Vector3f n = model->normal(Vector2i(uvP.x(), uvP.y())); // 法线贴图法线
+				Vector3f light = TBN * lightDir_;
+				float intensity = max(n.dot(light), 0.2f);
+
+				Color color = objectColor * intensity;
 				float z = p3f.z();
-				if (isLegal(x, height - y))
-					if (z > zBuffer[height - y][x])
-					{
-						zBuffer[height - y][x] = z;
-						set(x, y, color);
-					}
+				if (isLegal(x, height - y) && z > zBuffer[height - y][x])
+				{
+					setZBuffer(x, y, z);
+					set(x, y, color);
+				}
 			}
 		}
 }
 
 // draw triangle with normal map
+// Phong's lighting model
+// 错误
 void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, 
 	Vector2i uv0, Vector2i uv1, Vector2i uv2)
 {
@@ -244,21 +248,25 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 				Vector2i uvAB = uv1 - uv0,
 					uvAC = uv2 - uv0;
 				Vector2f uvP = uv0.cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>(); // u v ？？
-				Color diffuse = model->diffuse(Vector2i(uvP.x(), uvP.y()));
-				Vector3f n = model->normal(Vector2i(uvP.x(), uvP.y()));
-				float intensity = max(n.dot(light_dir), 0.3f);
 
-				Color color = diffuse * intensity;
+				Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
+				Vector3f n = model->normal(Vector2i(uvP.x(), uvP.y()));
+				Vector3f r = n * n.dot(lightDir_) * 2.0 - lightDir_; // reflected light
+				r.normalize();
+				float spec = pow(max(r.z(), 0.0f), model->specular(Vector2i(uvP.x(), uvP.y())));
+				float diff = max(0.0f, n.dot(lightDir_));
+				float intensity = max(n.dot(lightDir_), 0.3f);
+				Color color = objectColor * (diff + 0.6 * spec);
 				float z = p3f.z();
-				if (isLegal(x, height - y))
-					if (z > zBuffer[height - y][x])
-					{
-						zBuffer[height - y][x] = z;
-						set(x, y, color);
-					}
+				if (z > zBuffer[height - y][x])
+				{
+					zBuffer[height - y][x] = z;
+					set(x, y, color);
+				}
 			}
 		}
 }
+
 
 void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 {
@@ -273,7 +281,7 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 		Vector3f world_coords[3];
 		Vector3f model_coords[3];
 		Vector2i uv[3];
-		Vector2i normal[3];
+		Vector3f normal[3];
 		float intensity[3];
 		for (int j = 0; j < 3; ++j)
 		{
@@ -284,8 +292,9 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			model_coords[j] = transform(v, MVP);
 			screen_coords[j] = transform(model_coords[j], viewPortMatrix_);
 			//screen_coords[j] = worldToScreen(model_coords[j]);
-			intensity[j] = max(model->normal(i, j).dot(light_dir), 0.3f);
+			//intensity[j] = max(model->normal(i, j).dot(lightDir_), 0.3f);
 			uv[j] = model->uv(i, j);
+			normal[j] = model->normal(i, j);
 		}
 		if (mode == DrawMode::LINE)
 		{
@@ -299,7 +308,7 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 		{
 			//Vector3f n = (world_coords[1] - world_coords[0]).cross(world_coords[2] - world_coords[1]); // 三角形法线
 			//n.normalize();
-			//float intensity = n.dot(light_dir);
+			//float intensity = n.dot(lightDir_);
 			//if (intensity > 0)
 			//{
 			//	// 无纹理
@@ -313,12 +322,37 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			//}
 
 			// Gouroud shading
-			/*if (intensity[0] > 0 || intensity[1] > 0 || intensity[2] > 0)
-				this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2],
-								uv[0], uv[1], uv[2],
-								intensity[0], intensity[1], intensity[2]);*/
+			Matrix4f normalMatrix = modelMatrix.inverse().transpose();
+			// compute normal
+			//Vector3f triN = (world_coords[1] - world_coords[0]).cross(world_coords[2] - world_coords[1]);
+			//Vector3f triN = (normal[0] + normal[1] + normal[2]);
+			//triN.normalize();
+			Vector3f tangent, bitangent;
+			Vector3f edge1 = world_coords[1] - world_coords[0], 
+				edge2 = world_coords[2] - world_coords[0];
+			Vector2i deltaUV1 = uv[1] - uv[0], deltaUV2 = uv[2] - uv[0];
+			float f = 1.0 / (deltaUV1.x() * deltaUV2.y() - deltaUV2.x() * deltaUV1.y());
+			tangent << f * (deltaUV2.y() * edge1.x() - deltaUV1.y() * edge2.x()),
+				f *(deltaUV2.y() * edge1.y() - deltaUV1.y() * edge2.y()),
+				f *(deltaUV2.y() * edge1.z() - deltaUV1.y() * edge2.z());
+			tangent.normalize();
+			bitangent << f * (-deltaUV2.x() * edge1.x() + deltaUV1.x() * edge2.x()),
+				f *(-deltaUV2.x() * edge1.y() + deltaUV1.x() * edge2.y()),
+				f *(-deltaUV2.x() * edge1.z() + deltaUV1.x() * edge2.z());
+			Vector3f T = transform(tangent, normalMatrix);
+			Vector3f B = transform(bitangent, normalMatrix);
+			//Vector3f N = transform(triN, normalMatrix);
+			T.normalize(), B.normalize();// , N.normalize();
+			Matrix3f TBN;
+			TBN.row(0) = T;
+			TBN.row(1) = B;
+			//TBN.row(2) = N;
+
+			this->drawTriangle_gouraud(screen_coords[0], screen_coords[1], screen_coords[2],
+								normal[0], normal[1], normal[2],
+								uv[0], uv[1], uv[2], normalMatrix, TBN);
 			// normal map
-			this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0], uv[1], uv[2]);
+			//this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0], uv[1], uv[2]);
 		}
 	}
 }

@@ -8,6 +8,7 @@
 #include "head/Renderer.h"
 #include "head/Camera.h"
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 using namespace std;
 using namespace std::chrono;
 
@@ -186,7 +187,8 @@ int main()
 	init(WIDTH, HEIGHT, screen_fb);
 
 	Camera *camera = new Camera();
-	string model_path = "obj/african_head.obj";
+	//string model_path = "obj/african_head/african_head.obj";
+	string model_path = "obj/diablo3_pose/diablo3_pose.obj";
 	Model model(model_path);
 	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer, camera);
 
@@ -216,12 +218,9 @@ int main()
 		if (screen_keys['E'])
 			camera->move(Camera::Action::ZOOM_OUT);
 
-		Matrix4f modelMatrix;
-		modelMatrix <<
-			1, 0, 0, 0,
-			0, 1, 0, 0,
-			0, 0, 1, 0,
-			0, 0, 0, 1;
+		Matrix4f modelMatrix = Matrix4f::Identity();
+		Matrix3f m = Eigen::AngleAxisf(M_PI / 2, Vector3f(0, 1, 0)).matrix();
+		//modelMatrix.block<3, 3>(0, 0) = m;
 		renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE, modelMatrix);
 		screen_update();
 		//Sleep(1);

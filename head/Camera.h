@@ -13,6 +13,7 @@ public:
 
 	inline Matrix4f getViewMatrix(){ return viewMatrix_; }
 	inline Vector3f getPos() { return pos_; }
+	inline Vector3f getDirection() { return direction_; }
 	void updateLookAt(Vector3f pos, Vector3f target);
 	void updateLookAt();
 	void move(Action action);
