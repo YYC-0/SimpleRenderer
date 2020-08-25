@@ -191,8 +191,8 @@ int main()
 	Vector3f lightPos = Vector3f(1, 1, 1);
 	Camera *camera = new Camera();
 	Camera *lightCamera = new Camera(lightPos);
-	//string model_path = "obj/african_head/african_head.obj";
-	string model_path = "obj/diablo3_pose/diablo3_pose.obj";
+	string model_path = "obj/african_head/african_head.obj";
+	//string model_path = "obj/diablo3_pose/diablo3_pose.obj";
 	Model model(model_path);
 	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer, camera, lightPos);
 

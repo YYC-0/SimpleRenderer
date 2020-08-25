@@ -1,8 +1,11 @@
 #pragma once
 #include <Eigen/Core>
+#include <map>
+#include <string>
 #include "Color.h"
 #include "model.h"
 using namespace Eigen;
+using namespace std;
 
 class FShader
 {
@@ -17,9 +20,21 @@ protected:
 		Vector4f p_after = transformMatrix * p_h;
 		return Vector3f(p_after.x() / p_after[3], p_after.y() / p_after[3], p_after.z() / p_after[3]);
 	}
+	Vector3f reflect(Vector3f v, Vector3f n) {
+		// 由入射光v和表面法线计算反射向量
+		float project = v.dot(n);
+		Vector3f N = project * n;
+		Vector3f reflectVector = v - 2 * N;
+		reflectVector.normalize();
+		return reflectVector;
+	}
 };
+
 // 预先定义的一些shader，也可添加其他shader
 
+// Phong's lighting model
+// 使用了法向空间法线贴图
+// 使用了阴影映射
 class Shader : public FShader
 {
 public:
@@ -37,6 +52,7 @@ public:
 	float **shadowBuffer;
 	int height;
 	int width;
+	Vector3f cameraPos;
 
 	Shader(Matrix4f viewPort, Vector3f lightD, float **shadow, int h, int w) :
 		viewPortMatrix(viewPort), 
@@ -59,7 +75,7 @@ public:
 
 	virtual Color fragment(std::pair<float, float> barycentricUV)
 	{
-		// 计算屏幕坐标
+		// 计算当前像素对应的各个向量（不应该在这个函数中）
 		float u = barycentricUV.first, v = barycentricUV.second;
 		Vector2i uvAB = uv[1] - uv[0],
 			uvAC = uv[2] - uv[0];
@@ -70,7 +86,10 @@ public:
 		Vector3f p3f = screenCoords[0] + v * AB + u * AC; // u v ？？
 		Vector3f shadowP = transform(p3f, matrixShadow);
 
-		Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
+		Vector3f WAB = worldCoords[1] - worldCoords[0],
+			WAC = worldCoords[2] - worldCoords[0];
+		Vector3f worldPos = worldCoords[0] + v * AB + u * AC; // u v ？？
+
 		// 计算法向量
 		Vector3f NAB = normal[1] - normal[0],
 			NAC = normal[2] - normal[0];
@@ -81,19 +100,29 @@ public:
 		TBN.row(2) = N;
 		Vector3f n = model->normal(Vector2i(uvP.x(), uvP.y())); // 法线贴图法线
 		Vector3f light = TBN * lightDir; // 将光线方向转换到法向空间
+		light.normalize();
 
 		// compute color
 		// phong
+		Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
 		float ambient = 0.3;
 		float diff = std::max(n.dot(light), 0.0f);
+		float specularStrength = 0.5f;
+		Vector3f viewDir = cameraPos - worldPos;
+		viewDir.normalize();
+		Vector3f reflectDir = (-light, n);
+		float spec = pow(max(viewDir.dot(reflectDir), 0.0f), 16);
+		float specular = specularStrength * spec;
+
 		float shadowDepth = shadowBuffer[height - (int)shadowP.y()][(int)shadowP.x()];
 		float shadow = shadowDepth > shadowP.z()*shadowP.z() + std::max(0.001f, 0.02f*(1.0f-n.dot(light))) ? 1.0 : 0.0;
 		
-		Color color = objectColor * (ambient + (1.0 - shadow) * (diff));
+		Color color = objectColor * (ambient + (1.0 - shadow) * (diff + specular));
 		return color;
 	}
 
 	void setModel(Model *m) { model = m; }
+	void setCameraPos(Vector3f pos) { cameraPos = pos; }
 	void setMatrix(const Matrix4f &modelMatrix, const Matrix4f &projectionMatrix, const Matrix4f &viewMatrix, const Matrix4f &cameraT)
 	{
 		T = viewPortMatrix * projectionMatrix * viewMatrix * modelMatrix;
@@ -121,9 +150,10 @@ public:
 		TBN.row(0) = T;
 		TBN.row(1) = B;
 	}
-
 };
 
+// 绘制深度图
+// 用于阴影映射
 class DepthShader : public FShader
 {
 public:

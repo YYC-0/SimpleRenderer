@@ -22,6 +22,7 @@ public:
 	Vector3f normal(int iface, int nvert);
 	Vector3f normal(Vector2i uv);
 	Color diffuse(Vector2i uv);
+	Color diffuse(Vector2f uv);
 	float specular(Vector2i uv);
 	std::vector<int> face(int idx) const;
 

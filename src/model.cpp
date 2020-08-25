@@ -128,6 +128,13 @@ Color Model::diffuse(Vector2i uv)
     return Color(c[2], c[1], c[0]);
 }
 
+Color Model::diffuse(Vector2f uvf)
+{
+    Vector2i uv(uvf.x() * diffusemap_.get_width(), uvf.y() * diffusemap_.get_height());
+    TGAColor c = diffusemap_.get(uv.x(), uv.y());
+    return Color(c[2], c[1], c[0]);
+}
+
 float Model::specular(Vector2i uv)
 {
     return specularmap_.get(uv.x(), uv.y())[0] / 1.0;

@@ -314,6 +314,7 @@ void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, unsigned 
 				Vector3f AB = screenCoords[1] - screenCoords[0],
 					AC = screenCoords[2] - screenCoords[0];
 				Vector3f p3f = screenCoords[0] + v * AB + u * AC; // u v £¿£¿
+
 				float z = p3f.z();
 				z = z * z;
 				if (isLegal(x, height - y) && z > zBuffer[height - y][x])
@@ -431,6 +432,7 @@ void Renderer::drawModel_shader(Model *model, DrawMode mode, Matrix4f modelMatri
 	Camera lightCamera(lightDir_);
 
 	shader->setModel(model);
+	shader->setCameraPos(camera_->getPos());
 	Matrix4f cameraT = viewPortMatrix_ * cameraProjectionMatrix * lightCamera.getViewMatrix() * modelMatrix;
 	shader->setMatrix(modelMatrix, projectionMatrix_, camera_->getViewMatrix(), cameraT);
 
