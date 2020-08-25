@@ -20,10 +20,11 @@ public:
 	Vector3f vert(int iface, int nthvert) const;
 	Vector2i uv(int iface, int nvert);
 	Vector3f normal(int iface, int nvert);
-	Vector3f normal(Vector2i uv);
-	Color diffuse(Vector2i uv);
-	Color diffuse(Vector2f uv);
-	float specular(Vector2i uv);
+	Vector3f normal(const Vector2i &uv);
+	Color diffuse(const Vector2i &uv);
+	Color diffuse(const Vector2f &uv);
+	//Color specular(Vector2i uv);
+	float specular(const Vector2i &uv);
 	std::vector<int> face(int idx) const;
 
 private:

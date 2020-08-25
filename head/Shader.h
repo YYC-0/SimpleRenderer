@@ -22,9 +22,7 @@ protected:
 	}
 	Vector3f reflect(Vector3f v, Vector3f n) {
 		// 由入射光v和表面法线计算反射向量
-		float project = v.dot(n);
-		Vector3f N = project * n;
-		Vector3f reflectVector = v - 2 * N;
+		Vector3f reflectVector = v - 2 * (v.dot(n)) * n;
 		reflectVector.normalize();
 		return reflectVector;
 	}
@@ -34,6 +32,7 @@ protected:
 
 // Phong's lighting model
 // 使用了法向空间法线贴图
+// 使用了高光贴图
 // 使用了阴影映射
 class Shader : public FShader
 {
@@ -88,7 +87,7 @@ public:
 
 		Vector3f WAB = worldCoords[1] - worldCoords[0],
 			WAC = worldCoords[2] - worldCoords[0];
-		Vector3f worldPos = worldCoords[0] + v * AB + u * AC; // u v ？？
+		Vector3f worldPos = worldCoords[0] + v * WAB + u * WAC; // u v ？？
 
 		// 计算法向量
 		Vector3f NAB = normal[1] - normal[0],
@@ -105,19 +104,21 @@ public:
 		// compute color
 		// phong
 		Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
-		float ambient = 0.3;
+		float ambient = 0.2;
 		float diff = std::max(n.dot(light), 0.0f);
-		float specularStrength = 0.5f;
 		Vector3f viewDir = cameraPos - worldPos;
 		viewDir.normalize();
-		Vector3f reflectDir = (-light, n);
-		float spec = pow(max(viewDir.dot(reflectDir), 0.0f), 16);
-		float specular = specularStrength * spec;
+		Vector3f reflectDir = reflect(-light, n);
+		float spec = pow(max(viewDir.dot(reflectDir), 0.0f), 32);
+		float specular = model->specular(Vector2i(uvP.x(), uvP.y())) * spec * 0.02;
 
 		float shadowDepth = shadowBuffer[height - (int)shadowP.y()][(int)shadowP.x()];
 		float shadow = shadowDepth > shadowP.z()*shadowP.z() + std::max(0.001f, 0.02f*(1.0f-n.dot(light))) ? 1.0 : 0.0;
 		
 		Color color = objectColor * (ambient + (1.0 - shadow) * (diff + specular));
+		//float a;
+		//if (color == Color(255, 255, 255))
+		//	a = model->specular(Vector2i(uvP.x(), uvP.y()));
 		return color;
 	}
 

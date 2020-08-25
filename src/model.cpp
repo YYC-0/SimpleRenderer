@@ -113,7 +113,7 @@ Vector3f Model::normal(int iface, int nvert)
     return n;
 }
 
-Vector3f Model::normal(Vector2i uv)
+Vector3f Model::normal(const Vector2i &uv)
 {
     TGAColor c = normalmap_.get(uv[0], uv[1]);
     Vector3f n;
@@ -122,21 +122,28 @@ Vector3f Model::normal(Vector2i uv)
     return n;
 }
 
-Color Model::diffuse(Vector2i uv)
+Color Model::diffuse(const Vector2i &uv)
 {
     TGAColor c = diffusemap_.get(uv.x(), uv.y());
     return Color(c[2], c[1], c[0]);
 }
 
-Color Model::diffuse(Vector2f uvf)
+Color Model::diffuse(const Vector2f &uvf)
 {
     Vector2i uv(uvf.x() * diffusemap_.get_width(), uvf.y() * diffusemap_.get_height());
     TGAColor c = diffusemap_.get(uv.x(), uv.y());
     return Color(c[2], c[1], c[0]);
 }
 
-float Model::specular(Vector2i uv)
+float Model::specular(const Vector2i &uv)
 {
     return specularmap_.get(uv.x(), uv.y())[0] / 1.0;
 }
+
+//Color Model::specular(Vector2i uv)
+//{
+//    TGAColor c = specularmap_.get(uv.x(), uv.y());
+//    return Color(c[2], c[1], c[0]);
+//}
+
 
