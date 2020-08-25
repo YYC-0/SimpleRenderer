@@ -7,20 +7,19 @@
 #include <Eigen/Dense>
 #include <iostream>
 
-Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera)
+Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera, Vector3f lightDir)
 {
 	width = w;
 	height = h;
-	frameBuffer = fb;
+	frameBuffer_ = fb;
 	zBuffer = zbuf;
-	lightDir_ = Vector3f(1, 0, 0);
-
-	bufferClear();
+	lightDir_ = lightDir;
 	camera_ = camera;
 
 	zNear_ = -0.1;
 	zFar_ = -100.0;
-	FOV_ = M_PI / 4;
+	FOV_ = M_PI / 4.0;
+
 
 	initProjectionMatrix();
 	cout << "View Matrix:\n" << camera_->getViewMatrix() << endl;
@@ -33,6 +32,31 @@ Renderer::Renderer(int w, int h, unsigned int** fb, float **zbuf, Camera *camera
 		0,		height/2,	0,		 height/2,
 		0,		0,			1.0/2.0, 1.0/2.0,
 		0,		0,			0,		 1;
+
+	depthMap = new unsigned int *[height];
+	shadowBuffer = new float *[height];
+	for (int i = 0; i < height; ++i)
+	{
+		depthMap[i] = new unsigned int[width];
+		shadowBuffer[i] = new float[width];
+	}
+
+	bufferClear();
+
+	shader = new Shader(viewPortMatrix_, lightDir_, shadowBuffer, height, width);
+	depthShader = new DepthShader(viewPortMatrix_);
+
+}
+
+Renderer::~Renderer()
+{
+	for (int i = 0; i < height; ++i)
+	{
+		delete[] depthMap[i];
+		delete[] shadowBuffer[i];
+	}
+	delete shader;
+	delete depthShader;
 }
 
 void Renderer::bufferClear()
@@ -40,8 +64,11 @@ void Renderer::bufferClear()
 	for (int i = 0; i < height; ++i)
 		for (int j = 0; j < width; ++j)
 		{
-			frameBuffer[i][j] = 0;
-			zBuffer[i][j] = -10;
+			frameBuffer_[i][j] = 0;
+			zBuffer[i][j] = zFar_;
+
+			depthMap[i][j] = 0;
+			shadowBuffer[i][j] = zFar_;
 		}
 }
 
@@ -219,6 +246,7 @@ void Renderer::drawTriangle_gouraud(Vector3f t0, Vector3f t1, Vector3f t2,
 				{
 					setZBuffer(x, y, z);
 					set(x, y, color);
+					//set(x, y, Color(255,255,255) * ((z-zNear_) / (zFar_-zNear_)));
 				}
 			}
 		}
@@ -267,19 +295,53 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2,
 		}
 }
 
+void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, unsigned int **frameBuffer, float **zBuffer)
+{
+	int max_x = min((int)max(max(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), width - 1);
+	int min_x = max((int)min(min(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), 0);
+	int max_y = min((int)max(max(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), height - 1);
+	int min_y = max((int)min(min(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), 0);
+
+	for (int y = min_y; y <= max_y; ++y)
+	{
+		for (int x = min_x; x <= max_x; ++x)
+		{
+			Vector2i p(x, y);
+			pair<float, float> uv = barycentric(screenCoords[0], screenCoords[1], screenCoords[2], p);
+			float u = uv.first, v = uv.second;
+			if (u >= 0 && v >= 0 && u + v <= 1)
+			{
+				Vector3f AB = screenCoords[1] - screenCoords[0],
+					AC = screenCoords[2] - screenCoords[0];
+				Vector3f p3f = screenCoords[0] + v * AB + u * AC; // u v ？？
+				float z = p3f.z();
+				z = z * z;
+				if (isLegal(x, height - y) && z > zBuffer[height - y][x])
+				{
+					Color color = shader->fragment(uv);
+					zBuffer[height - y][x] = z;
+					frameBuffer[height - y][x] = color.hex;
+				}
+			}
+		}
+	}
+}
+
 
 void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 {
 	this->model = model;
 	Matrix4f viewMatrix = camera_->getViewMatrix();
 	Matrix4f MVP = projectionMatrix_ * viewMatrix * modelMatrix;
+
+#pragma omp parallel for
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
 		std::vector<int> face = model->face(i);
 
 		Vector3f screen_coords[3];
 		Vector3f world_coords[3];
-		Vector3f model_coords[3];
+		Vector3f NDC[3];
 		Vector2i uv[3];
 		Vector3f normal[3];
 		float intensity[3];
@@ -289,13 +351,17 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			Vector3f v = model->vert(face[j]);
 			world_coords[j] = v;
 			// coordnate transform
-			model_coords[j] = transform(v, MVP);
-			screen_coords[j] = transform(model_coords[j], viewPortMatrix_);
+			NDC[j] = transform(v, MVP);
+			screen_coords[j] = transform(NDC[j], viewPortMatrix_);
 			//screen_coords[j] = worldToScreen(model_coords[j]);
 			//intensity[j] = max(model->normal(i, j).dot(lightDir_), 0.3f);
 			uv[j] = model->uv(i, j);
 			normal[j] = model->normal(i, j);
 		}
+		// 丢弃不在视口中的图元
+		if(!isInView(NDC[0]) && !isInView(NDC[1]) && !isInView(NDC[2]))
+			continue;
+
 		if (mode == DrawMode::LINE)
 		{
 			for (int j = 0; j < 3; ++j)
@@ -327,6 +393,7 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			//Vector3f triN = (world_coords[1] - world_coords[0]).cross(world_coords[2] - world_coords[1]);
 			//Vector3f triN = (normal[0] + normal[1] + normal[2]);
 			//triN.normalize();
+			// 计算TBN矩阵
 			Vector3f tangent, bitangent;
 			Vector3f edge1 = world_coords[1] - world_coords[0], 
 				edge2 = world_coords[2] - world_coords[0];
@@ -354,6 +421,54 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			// normal map
 			//this->drawTriangle(screen_coords[0], screen_coords[1], screen_coords[2], uv[0], uv[1], uv[2]);
 		}
+	}
+}
+
+void Renderer::drawModel_shader(Model *model, DrawMode mode, Matrix4f modelMatrix)
+{
+	this->model = model;
+	Matrix4f cameraProjectionMatrix = computeProjectionMatrix(width, height, M_PI / 2, zNear_, zFar_);
+	Camera lightCamera(lightDir_);
+
+	shader->setModel(model);
+	Matrix4f cameraT = viewPortMatrix_ * cameraProjectionMatrix * lightCamera.getViewMatrix() * modelMatrix;
+	shader->setMatrix(modelMatrix, projectionMatrix_, camera_->getViewMatrix(), cameraT);
+
+	depthShader->setModel(model);
+	depthShader->setMatrix(modelMatrix, cameraProjectionMatrix, lightCamera.getViewMatrix());
+	Vector3f screenCoords[3];
+
+	// render shadow map
+	for (int i = 0; i < model->nfaces(); ++i)
+	{
+		std::vector<int> face = model->face(i);
+		for (int j = 0; j < 3; ++j)
+		{
+			screenCoords[j] = depthShader->vertex(i, j);
+		}
+		// 丢弃不在视口中的图元
+		if (!isInWindow(screenCoords[0]) && 
+			!isInWindow(screenCoords[1]) &&
+			!isInWindow(screenCoords[2]))
+			continue;
+		drawTriangle(screenCoords, depthShader, depthMap, shadowBuffer);
+	}
+
+//#pragma omp parallel for
+	for (int i = 0; i < model->nfaces(); ++i)
+	{
+		std::vector<int> face = model->face(i);
+		for (int j = 0; j < 3; ++j)
+		{
+			screenCoords[j] = shader->vertex(i, j);
+		}
+		// 丢弃不在视口中的图元
+		if (!isInWindow(screenCoords[0]) &&
+			!isInWindow(screenCoords[1]) &&
+			!isInWindow(screenCoords[2]))
+			continue;
+		shader->computeTBN();
+		drawTriangle(screenCoords, shader, frameBuffer_, zBuffer);
 	}
 }
 
@@ -446,4 +561,35 @@ void Renderer::initProjectionMatrix()
 		0, 1.0/tanHalfFOV,			0, 0,
 		0, 0, (-zNear_-zFar_)/zRange, -2.0*zFar_*zNear_/zRange,
 		0, 0, -1.0, 0;
+}
+
+Matrix4f Renderer::computeProjectionMatrix(float width, float height, float FOV, float zNear, float zFar)
+{
+	float ar = width / height;
+	float zRange = zFar - zNear;
+	float tanHalfFOV = tanf(FOV / 2.0);
+	Matrix4f projectionMatrix;
+	projectionMatrix <<
+		1.0 / (ar * tanHalfFOV), 0, 0, 0,
+		0, 1.0 / tanHalfFOV, 0, 0,
+		0, 0, (-zNear - zFar) / zRange, -2.0 * zFar * zNear / zRange,
+		0, 0, -1.0, 0;
+	return projectionMatrix;
+}
+
+// 检查p的坐标是否在裁剪空间中 [-1,1]
+bool Renderer::isInView(const Vector3f &p)
+{
+	if (p.x() >= -1 && p.x() <= 1 &&
+		p.y() >= -1 && p.y() <= 1)
+		return true;
+	return false;
+}
+
+bool Renderer::isInWindow(const Vector3f &p)
+{
+	if (p.x() >= 0 && p.x() <= width &&
+		p.y() >= 0 && p.y() <= height)
+		return true;
+	return false;
 }

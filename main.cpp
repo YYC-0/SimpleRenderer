@@ -7,6 +7,7 @@
 #include "head/model.h"
 #include "head/Renderer.h"
 #include "head/Camera.h"
+#include "head/Shader.h"
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 using namespace std;
@@ -179,6 +180,7 @@ void init(int width, int height, void* fb)
 const int WIDTH = 800;
 const int HEIGHT = 800;
 
+
 int main()
 {
 	TCHAR *title = _T("TEST");
@@ -186,11 +188,13 @@ int main()
 		return -1;
 	init(WIDTH, HEIGHT, screen_fb);
 
+	Vector3f lightPos = Vector3f(1, 1, 1);
 	Camera *camera = new Camera();
+	Camera *lightCamera = new Camera(lightPos);
 	//string model_path = "obj/african_head/african_head.obj";
 	string model_path = "obj/diablo3_pose/diablo3_pose.obj";
 	Model model(model_path);
-	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer, camera);
+	Renderer renderer(WIDTH, HEIGHT, frameBuffer, zBuffer, camera, lightPos);
 
 	Vector2i t0[3] = { Vector2i(10, 70),   Vector2i(400, 100),  Vector2i(200, 400)};
 	Vector3f t1[3] = { Vector3f(380, 700, 0),  Vector3f(150, 700, 0),   Vector3f(70, 480, 0) };
@@ -221,7 +225,8 @@ int main()
 		Matrix4f modelMatrix = Matrix4f::Identity();
 		Matrix3f m = Eigen::AngleAxisf(M_PI / 2, Vector3f(0, 1, 0)).matrix();
 		//modelMatrix.block<3, 3>(0, 0) = m;
-		renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE, modelMatrix);
+		//renderer.drawModel(&model, Renderer::DrawMode::TRIANGLE, modelMatrix);
+		renderer.drawModel_shader(&model, Renderer::DrawMode::TRIANGLE, modelMatrix);
 		screen_update();
 		//Sleep(1);
 		auto end = steady_clock::now();
@@ -231,7 +236,3 @@ int main()
 
 	return 0;
 }
-
-// TO DO
-// 伽马校正
-// 并行优化

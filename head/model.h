@@ -17,6 +17,7 @@ public:
 	int nverts() const;
 	int nfaces() const;
 	Vector3f vert(int i) const;
+	Vector3f vert(int iface, int nthvert) const;
 	Vector2i uv(int iface, int nvert);
 	Vector3f normal(int iface, int nvert);
 	Vector3f normal(Vector2i uv);

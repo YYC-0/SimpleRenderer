@@ -15,6 +15,7 @@ public:
 		hex = b + (g << 8) + (r << 16);
 	}
 	inline Color operator*(float k);
+	inline Color operator+(int k);
 	inline Color operator+(const Color &c);
 	inline bool operator==(Color &c);
 
@@ -26,9 +27,23 @@ public:
 
 inline Color Color::operator*(float k)
 {
-	unsigned int newR = r * k;
-	unsigned int newG = g * k;
-	unsigned int newB = b * k;
+	int newR = (float)r * k;
+	int newG = (float)g * k;
+	int newB = (float)b * k;
+	if (newR > 255) newR = 255;
+	if (newR < 0) newR = 0;
+	if (newG > 255) newG = 255;
+	if (newG < 0) newG = 0;
+	if (newB > 255) newB = 255;
+	if (newB < 0) newB = 0;
+	return Color(newR, newG, newB);
+}
+
+inline Color Color::operator+(int k)
+{
+	int newR = (int)r + k;
+	int newG = (int)g + k;
+	int newB = (int)b + k;
 	if (newR > 255) newR = 255;
 	if (newR < 0) newR = 0;
 	if (newG > 255) newG = 255;

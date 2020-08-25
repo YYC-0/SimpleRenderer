@@ -94,6 +94,11 @@ Vector3f Model::vert(int i) const
     return verts_[i];
 }
 
+Vector3f Model::vert(int iface, int nthvert) const
+{
+    return verts_[faces_[iface][nthvert][0]];
+}
+
 Vector2i Model::uv(int iface, int nvert)
 {
     int idx = faces_[iface][nvert][1];
