@@ -45,6 +45,7 @@ private:
 	Camera *camera_;
 	Matrix4f projectionMatrix_;
 	Matrix4f viewPortMatrix_;
+	omp_lock_t mylock;
 
 	float FOV_;
 	float zNear_;
@@ -69,5 +70,6 @@ private:
 	Matrix4f computeProjectionMatrix(float width, float height, float FOV, float zNear, float zFar);
 	bool isInView(const Vector3f &p);
 	bool isInWindow(const Vector3f &p);
+	bool culling(Vector3f screenCoords[3]);
 };
 

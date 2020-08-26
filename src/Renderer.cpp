@@ -41,6 +41,7 @@ Renderer::Renderer(int w, int h, unsigned int** fb, Camera *camera, Vector3f lig
 
 	shader = new Shader(viewPortMatrix_, lightDir_, shadowBuffer, height, width);
 	depthShader = new DepthShader(viewPortMatrix_);
+	omp_init_lock(&mylock);
 }
 
 Renderer::~Renderer()
@@ -54,6 +55,7 @@ Renderer::~Renderer()
 	delete shader;
 	delete depthShader;
 	delete zBuffer;
+	omp_destroy_lock(&mylock);
 }
 
 void Renderer::bufferClear()
@@ -156,12 +158,13 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &
 		}
 }
 
+// 使用shader绘制三角形
 void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, int iface, unsigned int **frameBuffer, float **zBuffer)
 {
 	int max_x = min((int)max(max(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), width - 1);
 	int min_x = max((int)min(min(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), 0);
-	int max_y = min((int)max(max(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), height - 1);
-	int min_y = max((int)min(min(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), 0);
+	int max_y = min((int)max(max(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), height);
+	int min_y = max((int)min(min(screenCoords[0].y(), screenCoords[1].y()), screenCoords[2].y()), 1);
 
 	for (int y = min_y; y <= max_y; ++y)
 	{
@@ -178,7 +181,7 @@ void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, int iface
 
 				float z = p3f.z();
 				z = z * z;
-				if (isLegal(x, height - y) && z > zBuffer[height - y][x])
+				if (z > zBuffer[height - y][x])
 				{
 					Color color = shader->fragment(iface, uv);
 					zBuffer[height - y][x] = z;
@@ -208,7 +211,6 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
 		Vector3f screenCoords[3];
-		std::vector<int> face = model->face(i);
 		for (int j = 0; j < 3; ++j)
 		{
 			screenCoords[j] = depthShader->vertex(i, j);
@@ -225,11 +227,13 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
 		Vector3f screenCoords[3];
-		std::vector<int> face = model->face(i);
 		for (int j = 0; j < 3; ++j)
 		{
 			screenCoords[j] = shader->vertex(i, j);
 		}
+		// 背面剔除
+		if (culling(screenCoords))
+			continue;
 		// 丢弃不在视口中的图元
 		if (!isInWindow(screenCoords[0]) &&
 			!isInWindow(screenCoords[1]) &&
@@ -347,4 +351,14 @@ bool Renderer::isInWindow(const Vector3f &p)
 		p.y() >= 0 && p.y() <= height)
 		return true;
 	return false;
+}
+
+// 背面剔除
+// return true means need culling
+bool Renderer::culling(Vector3f screenCoords[3])
+{
+	Vector3f AB = screenCoords[1] - screenCoords[0],
+		BC = screenCoords[2] - screenCoords[1];
+	Vector3f n = AB.cross(BC);
+	return n.dot(Vector3f(0, 0, 1)) >= 0 ? false : true;
 }
