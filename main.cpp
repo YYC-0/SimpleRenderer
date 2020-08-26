@@ -23,8 +23,8 @@ int main()
 		return -1;
 	init(WIDTH, HEIGHT, screen_fb);
 
-	//string model_path = "obj/african_head/african_head.obj";
-	string model_path = "obj/diablo3_pose/diablo3_pose.obj";
+	string model_path = "obj/african_head/african_head.obj";
+	//string model_path = "obj/diablo3_pose/diablo3_pose.obj";
 	Vector3f lightPos = Vector3f(1, 1, 1);
 	Camera *camera = new Camera();
 	Model model(model_path);

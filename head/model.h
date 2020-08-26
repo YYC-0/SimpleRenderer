@@ -16,10 +16,10 @@ public:
 	~Model();
 	int nverts() const;
 	int nfaces() const;
-	Vector3f vert(int i) const;
-	Vector3f vert(int iface, int nthvert) const;
-	Vector2i uv(int iface, int nvert);
-	Vector3f normal(int iface, int nvert);
+	Vector3f vert(const int& i) const;
+	Vector3f vert(const int &iface, const int &nthvert) const;
+	Vector2i uv(const int &iface, const int &nvert);
+	Vector3f normal(const int &iface, const int &nvert);
 	Vector3f normal(const Vector2i &uv);
 	Color diffuse(const Vector2i &uv);
 	Color diffuse(const Vector2f &uv);

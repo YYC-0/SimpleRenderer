@@ -109,21 +109,18 @@ public:
 		// compute color
 		// phong
 		Color objectColor = model->diffuse(Vector2i(uvP.x(), uvP.y()));
-		float ambient = 0.2;
+		float ambient = 0.3;
 		float diff = std::max(n.dot(light), 0.0f);
 		Vector3f viewDir = cameraPos - worldPos;
 		viewDir.normalize();
 		Vector3f reflectDir = reflect(-light, n);
 		float spec = pow(max(viewDir.dot(reflectDir), 0.0f), 32);
-		float specular = model->specular(Vector2i(uvP.x(), uvP.y())) * spec * 0.02;
+		float specular = model->specular(Vector2i(uvP.x(), uvP.y())) * spec * 0.01;
 
 		float shadowDepth = shadowBuffer[height - (int)shadowP.y()][(int)shadowP.x()];
 		float shadow = shadowDepth > shadowP.z()*shadowP.z() + std::max(0.001f, 0.02f*(1.0f-n.dot(light))) ? 1.0 : 0.0;
 		
 		Color color = objectColor * (ambient + (1.0 - shadow) * (diff + specular));
-		//float a;
-		//if (color == Color(255, 255, 255))
-		//	a = model->specular(Vector2i(uvP.x(), uvP.y()));
 		return color;
 	}
 

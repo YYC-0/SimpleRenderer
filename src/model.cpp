@@ -89,23 +89,23 @@ void Model::load_texture(std::string fileName, const char *suffix, TGAImage &img
     }
 }
 
-Vector3f Model::vert(int i) const 
+Vector3f Model::vert(const int &i) const
 {
     return verts_[i];
 }
 
-Vector3f Model::vert(int iface, int nthvert) const
+Vector3f Model::vert(const int &iface, const int &nthvert) const
 {
     return verts_[faces_[iface][nthvert][0]];
 }
 
-Vector2i Model::uv(int iface, int nvert)
+Vector2i Model::uv(const int &iface, const int &nvert)
 {
     int idx = faces_[iface][nvert][1];
     return Vector2i(uv_[idx].x() * diffusemap_.get_width(), uv_[idx].y() * diffusemap_.get_height());
 }
 
-Vector3f Model::normal(int iface, int nvert)
+Vector3f Model::normal(const int &iface, const int &nvert)
 {
     int idx = faces_[iface][nvert][2];
     Vector3f n = norms[idx];
