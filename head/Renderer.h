@@ -31,7 +31,7 @@ public:
 	void drawLine(Vector2i t0, Vector2i t1, const Color& c);
 	void drawTriangle(Vector2i t0, Vector2i t1, Vector2i t2, const Color &c);
 	void drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &c);
-	void drawTriangle(Vector3f screenCoords[3], FShader *shader, unsigned int **frameBuff, float **zBuffer);
+	void drawTriangle(Vector3f screenCoords[3], FShader *shader, int iface, unsigned int **frameBuff, float **zBuffer);
 	void drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix = Matrix4f::Identity()); // draw obj model
 
 private:

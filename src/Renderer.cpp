@@ -156,7 +156,7 @@ void Renderer::drawTriangle(Vector3f t0, Vector3f t1, Vector3f t2, const Color &
 		}
 }
 
-void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, unsigned int **frameBuffer, float **zBuffer)
+void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, int iface, unsigned int **frameBuffer, float **zBuffer)
 {
 	int max_x = min((int)max(max(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), width - 1);
 	int min_x = max((int)min(min(screenCoords[0].x(), screenCoords[1].x()), screenCoords[2].x()), 0);
@@ -180,7 +180,7 @@ void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, unsigned 
 				z = z * z;
 				if (isLegal(x, height - y) && z > zBuffer[height - y][x])
 				{
-					Color color = shader->fragment(uv);
+					Color color = shader->fragment(iface, uv);
 					zBuffer[height - y][x] = z;
 					frameBuffer[height - y][x] = color.hex;
 				}
@@ -202,11 +202,12 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 
 	depthShader->setModel(model);
 	depthShader->setMatrix(modelMatrix, cameraProjectionMatrix, lightCamera.getViewMatrix());
-	Vector3f screenCoords[3];
 
 	// render shadow map
+#pragma omp parallel for num_threads(8)
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
+		Vector3f screenCoords[3];
 		std::vector<int> face = model->face(i);
 		for (int j = 0; j < 3; ++j)
 		{
@@ -217,12 +218,13 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			!isInWindow(screenCoords[1]) &&
 			!isInWindow(screenCoords[2]))
 			continue;
-		drawTriangle(screenCoords, depthShader, depthMap, shadowBuffer);
+		drawTriangle(screenCoords, depthShader, i, depthMap, shadowBuffer);
 	}
 
-//#pragma omp parallel for
+#pragma omp parallel for num_threads(8)
 	for (int i = 0; i < model->nfaces(); ++i)
 	{
+		Vector3f screenCoords[3];
 		std::vector<int> face = model->face(i);
 		for (int j = 0; j < 3; ++j)
 		{
@@ -233,8 +235,8 @@ void Renderer::drawModel(Model *model, DrawMode mode, Matrix4f modelMatrix)
 			!isInWindow(screenCoords[1]) &&
 			!isInWindow(screenCoords[2]))
 			continue;
-		shader->computeTBN();
-		drawTriangle(screenCoords, shader, frameBuffer_, zBuffer);
+		shader->computeTBN(i);
+		drawTriangle(screenCoords, shader, i, frameBuffer_, zBuffer);
 	}
 }
 
@@ -300,7 +302,6 @@ Vector3f Renderer::transform(const Vector3f &p, const Matrix4f &transformMatrix)
 	Vector4f p_h(p.x(), p.y(), p.z(), 1);
 	Vector4f p_after = transformMatrix * p_h;
 	return Vector3f(p_after.x() / p_after[3], p_after.y() / p_after[3], p_after.z() / p_after[3]);
-	//return Vector3f(p_after.x(), p_after.y(), p_after.z());
 }
 
 

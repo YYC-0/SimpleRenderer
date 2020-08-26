@@ -50,7 +50,7 @@ Model::Model(const std::string& filename) : verts_(), faces_() {
             faces_.push_back(f);
         }
     }
-    std::cerr << "# v# " << verts_.size() << " f# "  << faces_.size() << std::endl;
+    std::cerr << "vertices: " << verts_.size() << "\tfaces: "  << faces_.size() << std::endl;
     load_texture(filename, "_diffuse.tga", diffusemap_);
     //load_texture("obj/grid.tga", ".tga", diffusemap_);
     load_texture(filename, "_nm_tangent.tga", normalmap_);
