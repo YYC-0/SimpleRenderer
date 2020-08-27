@@ -12,6 +12,8 @@
 
 Eigen (向量运算)、windows API (屏幕绘制)
 
+注：VS中配置属性-> C/C++ -> 语言 -> 符合模式需设为否，OpenMP支持需打开
+
 ### 主要实现功能：
 
 * Bresenham算法绘制直线
