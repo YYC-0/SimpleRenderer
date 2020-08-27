@@ -18,7 +18,7 @@ const int HEIGHT = 800;
 
 int main()
 {
-	TCHAR *title = _T("TEST");
+	TCHAR *title = _T("SimpleRenderer | WASD移动视角, QE缩放");
 	if (screen_init(WIDTH, HEIGHT, title))
 		return -1;
 	init(WIDTH, HEIGHT, screen_fb);
