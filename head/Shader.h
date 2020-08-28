@@ -83,16 +83,16 @@ public:
 		float u = barycentricUV.first, v = barycentricUV.second;
 		Vector2i uvAB = uv[iface][1] - uv[iface][0],
 			uvAC = uv[iface][2] - uv[iface][0];
-		Vector2f uvP = uv[iface][0].cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>(); // u v ？？
+		Vector2f uvP = uv[iface][0].cast<float>() + v * uvAB.cast<float>() + u * uvAC.cast<float>();
 
 		Vector3f AB = screenCoords[iface][1] - screenCoords[iface][0],
 			AC = screenCoords[iface][2] - screenCoords[iface][0];
-		Vector3f p3f = screenCoords[iface][0] + v * AB + u * AC; // u v ？？
+		Vector3f p3f = screenCoords[iface][0] + v * AB + u * AC;
 		Vector3f shadowP = transform(p3f, matrixShadow);
 
 		Vector3f WAB = worldCoords[iface][1] - worldCoords[iface][0],
 			WAC = worldCoords[iface][2] - worldCoords[iface][0];
-		Vector3f worldPos = worldCoords[iface][0] + v * WAB + u * WAC; // u v ？？
+		Vector3f worldPos = worldCoords[iface][0] + v * WAB + u * WAC;
 
 		// 计算法向量
 		Vector3f NAB = normal[iface][1] - normal[iface][0],
@@ -195,7 +195,7 @@ public:
 		//float u = barycentricUV.first, v = barycentricUV.second;
 		//Vector3f AB = screenCoords[1] - screenCoords[0],
 		//	AC = screenCoords[2] - screenCoords[0];
-		//Vector3f p3f = screenCoords[0] + v * AB + u * AC; // u v ？？
+		//Vector3f p3f = screenCoords[0] + v * AB + u * AC;
 		//return Color(255, 255, 255) * (p3f.z()-1.0) * 2;
 		return Color();
 	}

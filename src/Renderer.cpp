@@ -177,7 +177,7 @@ void Renderer::drawTriangle(Vector3f screenCoords[3], FShader *shader, int iface
 			{
 				Vector3f AB = screenCoords[1] - screenCoords[0],
 					AC = screenCoords[2] - screenCoords[0];
-				Vector3f p3f = screenCoords[0] + v * AB + u * AC; // u v £¿£¿
+				Vector3f p3f = screenCoords[0] + v * AB + u * AC;
 
 				float z = p3f.z();
 				z = z * z;
